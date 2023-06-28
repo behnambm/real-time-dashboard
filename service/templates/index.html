@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<canvas id="btc-line-chart" width="5" height="5" style="display: block; max-width: 98% !important; max-height: 420px;"></canvas>
+<canvas id="eth-line-chart" width="5" height="5" style="display: inline-block; max-width: 65% !important; max-height: 420px;"></canvas>
+<canvas id="dog-line-chart" width="5" height="5" style="display: inline-block; max-width: 600px !important; max-height: 420px;"></canvas>
+
+
+
+
+<script
+        src="https://cdn.jsdelivr.net/npm/chart.js@4.0.1/dist/chart.umd.min.js"></script>
+<script>
+    var btcChar = new Chart(document.getElementById("btc-line-chart"), {
+        options: {
+            tension: 0.1,
+        },
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                data: [],
+                label: "D 1",
+                borderColor: "#c45850",
+                backgroundColor: "#fcdfdd",
+                fill: true
+            }
+            ]
+        },
+    });
+    var ethChar = new Chart(document.getElementById("eth-line-chart"), {
+        options: {
+            tension: 0.1,
+        },
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                data: [],
+                label: "D 2",
+                borderColor: "#a8a8a8",
+                backgroundColor: "#e6e6e6",
+                fill: true,
+
+            }
+            ]
+        },
+    });
+    var dogChar = new Chart(document.getElementById("dog-line-chart"), {
+        options: {
+            tension: 0.3,
+        },
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                data: [],
+                label: "D 3",
+                borderColor: "#f1e663",
+                backgroundColor: "#fffcdf",
+                fill: true
+            }
+            ]
+        },
+    });
+    var source = new EventSource("/stream");
+    source.addEventListener("btc", (btcev) => {
+        var s = JSON.parse(btcev.data).map(i => i.y)
+        btcChar.data.datasets[0].data = s
+        btcChar.data.labels = JSON.parse(btcev.data).map(i => i.x)
+        btcChar.update()
+    })
+    source.addEventListener("eth", (ethev) => {
+        var s = JSON.parse(ethev.data).map(i => i.y)
+        ethChar.data.datasets[0].data = s
+        ethChar.data.labels = JSON.parse(ethev.data).map(i => i.x)
+        ethChar.update()
+    })
+    source.addEventListener("dog", (dogev) => {
+        var s = JSON.parse(dogev.data).map(i => i.y)
+        dogChar.data.datasets[0].data = s
+        dogChar.data.labels = JSON.parse(dogev.data).map(i => i.x)
+        dogChar.update()
+    })
+    source.onerror = (err) => {
+        console.error("EventSource failed:", err);
+    };
+</script>
+
+</body>
+</html>

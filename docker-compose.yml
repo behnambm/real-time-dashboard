@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  datasource:
+    build:
+      context: ./datasource
+    environment:
+      REDIS_HOST: "broker:6379"
+      CONSUL_ADDRESS: "consul:8500"
+      DYNAMIC_CONFIG_REFRESH_RATE: 3
+    restart: on-failure
+    networks:
+      - internal
+      - consul
+    depends_on:
+      - consul
+
+  backend:
+    build:
+      context: ./service
+    ports:
+      - "8080:8080"
+    environment:
+      REDIS_HOST: "broker:6379"
+      CONSUL_ADDRESS: "consul:8500"
+    networks:
+      - internal
+      - consul
+
+  broker:
+    image: redis:latest
+    networks:
+      - internal
+
+  consul:
+    image: consul:1.15
+    networks:
+      - consul
+#    command: agent
+    ports:
+      - "8500:8500"
+    command: agent -server -bind 0.0.0.0 -client 0.0.0.0 -bootstrap-expect 1 -config-file=/consul/config/config.json
+    volumes:
+      - ./consul/config.json:/consul/config/config.json
+      - consul-data:/consul/data
+
+networks:
+  internal:
+  consul:
+
+volumes:
+  consul-data:

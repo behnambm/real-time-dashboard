@@ -1,0 +1,15 @@
+{
+  "datacenter": "dc1",
+  "data_dir": "/consul/data",
+  "enable_local_script_checks": true,
+  "disable_remote_exec": true,
+  "primary_datacenter": "dc1",
+  "log_level": "DEBUG",
+  "server": true,
+  "ui": true,
+  "bootstrap": true,
+  "client_addr":"0.0.0.0",
+  "connect": {
+    "enabled": false
+  }
+}
