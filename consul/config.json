@@ -9,6 +9,7 @@
   "ui": true,
   "bootstrap": true,
   "client_addr":"0.0.0.0",
+  "server_rejoin_age_max": "999999h",
   "connect": {
     "enabled": false
   }
