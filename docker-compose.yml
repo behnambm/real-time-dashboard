@@ -7,7 +7,7 @@ services:
     environment:
       REDIS_HOST: "broker:6379"
       CONSUL_ADDRESS: "consul:8500"
-      DYNAMIC_CONFIG_REFRESH_RATE: 3
+      DYNAMIC_CONFIG_REFRESH_RATE: 5
     restart: on-failure
     networks:
       - internal
@@ -23,6 +23,7 @@ services:
     environment:
       REDIS_HOST: "broker:6379"
       CONSUL_ADDRESS: "consul:8500"
+      DYNAMIC_CONFIG_REFRESH_RATE: 5
     networks:
       - internal
       - consul
