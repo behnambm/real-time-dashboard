@@ -1,11 +1,11 @@
 build_data_source:
-	@go build -o ./datasource/datasource.out ./datasource/main.go
+	@go build -o ./datasource/datasource.out ./datasource/*.go
 
 build_server:
-	@go build -o ./service/server.out ./service/main.go
+	@go build -o ./service/server.out ./service/*.go
 
 
-compose: build_data_source build_server
+up: build_data_source build_server
 	@docker compose up --build
 
 
