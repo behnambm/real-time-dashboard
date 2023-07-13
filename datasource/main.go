@@ -9,9 +9,8 @@ import (
 	"golang.org/x/sync/semaphore"
 	"log"
 	"math/rand"
-	"os"
+	"runtime"
 	"strconv"
-	"sync"
 	"time"
 )
 
@@ -20,89 +19,9 @@ type Coordinate struct {
 	Y string `json:"y"`
 }
 
-type StaticConfig struct {
-	ConsulAddress     string
-	ConfigRefreshRate string
-}
-
-func (sc *StaticConfig) LoadFromEnv() {
-	consulAddress, isPresent := os.LookupEnv("CONSUL_ADDRESS")
-	if !isPresent {
-		panic("CONSUL ADDRESS is not defined")
-	}
-
-	configRefreshRate, isPresent := os.LookupEnv("DYNAMIC_CONFIG_REFRESH_RATE")
-	if !isPresent {
-		panic("DYNAMIC_CONFIG_REFRESH_RATE is not defined")
-	}
-
-	sc.ConfigRefreshRate = configRefreshRate
-	sc.ConsulAddress = consulAddress
-}
-
-type DynamicConfig struct {
-	configServer *api.Client
-	configTable  map[string]string
-	mu           sync.Mutex
-}
-
-func (dc *DynamicConfig) FetchConfig(key string) string {
-	kv := dc.configServer.KV()
-	pair, _, err := kv.Get(key, nil)
-	if err != nil {
-		log.Println(err)
-	}
-
-	if pair == nil {
-		return ""
-	}
-
-	return string(pair.Value)
-}
-
-func (dc *DynamicConfig) WaitAndUpdateConfig(key string) {
-	for {
-		value := dc.FetchConfig(key)
-		if value != "" {
-			dc.SetConfig(key, value)
-			break
-		}
-		time.Sleep(time.Millisecond * 3500)
-	}
-}
-
-func (dc *DynamicConfig) SetConfig(key, value string) {
-	dc.mu.Lock()
-	defer dc.mu.Unlock()
-	dc.configTable[key] = value
-}
-
-func (dc *DynamicConfig) GetKeys() []string {
-	dc.mu.Lock()
-	defer dc.mu.Unlock()
-
-	var keyList []string
-	for k, _ := range dc.configTable {
-		keyList = append(keyList, k)
-	}
-	return keyList
-}
-
-func (dc *DynamicConfig) RefreshConfigs(refreshRate int) {
-	for {
-		for _, key := range dc.GetKeys() {
-			dc.SetConfig(key, dc.FetchConfig(key))
-		}
-		time.Sleep(time.Second * time.Duration(refreshRate))
-	}
-}
-
-func (dc *DynamicConfig) GetConfig(key string) string {
-	dc.mu.Lock()
-	defer dc.mu.Unlock()
-
-	value, _ := dc.configTable[key]
-	return value
+type Source struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
 }
 
 func main() {
@@ -122,11 +41,12 @@ func main() {
 		configTable:  make(map[string]string),
 	}
 
-	dConfig.WaitAndUpdateConfig("datasource/refresh_rate")
-	dConfig.WaitAndUpdateConfig("datasource/broker/host")
-	dConfig.WaitAndUpdateConfig("datasource/broker/port")
-
 	refreshRate, _ := strconv.Atoi(sConfig.ConfigRefreshRate)
+	dConfig.WaitAndUpdateConfig("datasource/refresh_rate", refreshRate)
+	dConfig.WaitAndUpdateConfig("datasource/broker/host", refreshRate)
+	dConfig.WaitAndUpdateConfig("datasource/broker/port", refreshRate)
+	dConfig.WaitAndUpdateConfig("datasource/broker/channels", refreshRate)
+
 	go dConfig.RefreshConfigs(refreshRate)
 
 	rdb := redis.NewClient(&redis.Options{
@@ -135,7 +55,7 @@ func main() {
 		DB:       0,
 	})
 
-	sem := semaphore.NewWeighted(3)
+	sem := semaphore.NewWeighted(int64(runtime.NumCPU()))
 	publish := func(name string, n int) {
 		defer sem.Release(1)
 		payload, err := json.Marshal(GenerateGraphData(n))
@@ -147,10 +67,17 @@ func main() {
 	}
 
 	for {
-		sem.Acquire(context.Background(), 3)
-		go publish("btc", 64)
-		go publish("eth", 26)
-		go publish("dog", 8)
+		channels := dConfig.GetConfig("datasource/broker/channels")
+		var channelsList []Source
+		err := json.Unmarshal([]byte(channels), &channelsList)
+		if err != nil {
+			log.Println("INVALID channels VALUE")
+		} else {
+			for _, channelSource := range channelsList {
+				sem.Acquire(context.Background(), 1)
+				go publish(channelSource.Name, channelSource.Count)
+			}
+		}
 
 		refreshRate, _ := strconv.Atoi(dConfig.GetConfig("datasource/refresh_rate"))
 		time.Sleep(time.Millisecond * time.Duration(refreshRate))
